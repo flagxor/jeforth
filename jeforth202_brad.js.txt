@@ -1,0 +1,542 @@
+﻿/* jeForth 2.02--- An eForth Implementation in Javascript --- BSD license
+   2020/12/30 add:     \ ( .( ." spaces aft ( load.txt catch throw )
+     and or xor not negate abs 2* 2/ date int
+     Chen-Hanson Ting
+   2011/12/28 add:    0= 0< 0> 0<> 0<= 0>= = > < <> >= <= ==
+     docon constant dovar variable create allot
+     @ ? ! swap nip rot pick roll >r r> r@ for next
+     .r space samsuanchen@gmail.com
+   2011/12/27 add:    branch 0branch if else then begin again until while repeat
+     .s + 1+ 2+ - 1- 2- / mod div samsuanchen@gmail.com
+     add:    see yapcheahshen@gmail.com
+     modify: see samsuanchen@gmail.com
+   2011/12/26 add:    hex decimal base@ base! cr [ ] findword ' ['] words
+     modify: . samsuanchen@gmail.com
+   2011/12/23 initial: here , dolit exit : ; * dup drop . yapcheahshen@gmail.com
+     equiv to http://tutor.ksana.tw/ksanavm lesson1~8
+*/
+(function() {
+"uses strict";
+ /* global members for KsanaVm instance*/
+ function KsanaVm(dictsize) {
+   /* private members for KsanaVm instance*/
+   dictsize=dictsize || 0xfff; // default 4095 cells, for & in execprimitive )
+   var dictionary=new Array(dictsize+1) ;
+   var stack=[], rstack=[]; // native array pop and push
+   var ip=0; // instruction pointer
+   var abortexec=false;
+   var tib="", ntib=0, here=0, base=10;
+   var newname,newxt; // for word under construction
+   var compiling=false;
+   var token="";
+   this.ticktype=0; // 'type vector not defined yet
+   function systemtype(t){if(ticktype)ticktype(t);}
+   function redtype(t){systemtype("<font color='red'>"+t+"</font>");}
+   function bluetype(t){systemtype("<font color='blue'>"+t+"</font>");}
+   function greentype(t){systemtype("<font color='green'>"+t+"</font>");}
+   function pinktype(t){systemtype("<font color='pink'>"+t+"</font>");}
+   function cr(){systemtype("<br/>\n");}
+   function reset(){abortexec=true; stack=[]; rstack=[]; compiling=false;}
+   function nexttoken(deli){
+       token=""; 
+       if (deli===undefined) deli=" "; 
+       while(tib.substr(ntib,1)===" "||tib.substr(ntib,1)==="\n"||tib.substr(ntib,1)==="\t" ) ntib++;
+       while(ntib<tib.length && tib.substr(ntib,1)!=deli && tib.substr(ntib,1)!="\n") {
+         token+=tib.substr(ntib++,1); }
+       if (deli!=" ") ntib++;
+       return token;
+   }
+   function dictcompile(n){dictionary[here++]=n;}
+   function findword(name){for(var i=words.length-1;i>=0;i--)if(words[i].name===name)break; return i;}
+   /* in dictionary, primitive words have the format of 0x40000000+index in words */
+   function isprimitive(addr){return(addr & 0x40000000);}
+   function execprimitive(addr){words[addr & dictsize].xt();}
+   function compilecode(n){ 
+       if(typeof(n)==="string")n=findword(n); // compilecode("wordname") , find out the word index by name
+       if(typeof(words[n].xt)==="function")
+         dictcompile(0x40000000|n);     // a primitive, xt is a function
+       else dictcompile(words[n].xt);}     // high level words , xt is a number
+   function execute(xt){  
+       if(typeof(xt)==="function")xt();     // execute a low level primitive
+       else   call(xt);    // call a high level definition
+   };
+   function call(xt){   
+       abortexec=false; ip=xt; // inner loop
+   }
+   function step() {
+       var addr=dictionary[ip++];      // go to next cell
+       if(isprimitive(addr))execprimitive(addr)    // a primitive
+       else{rstack.push(ip); ip=addr;}    
+   }
+   function ret(){         // high level return
+       ip=rstack.pop();}
+   function run() {
+       abortexec = false;
+       while (!abortexec) {
+         try {
+           if (ip === undefined) {
+             interp();
+           } else {
+             step();
+           } 
+         } catch(e) {
+           if (e == "") {
+             onend();
+           } else {
+             onerr(e);
+           }
+           return;
+         }
+       }
+   }
+   function exec(cmd, err, end) {
+       ntib=0; tib=cmd;
+       onerr = err; onend = end;
+       ip = null;
+       run();
+   }
+   function interp() {
+       token=nexttoken(); if(token==="") {
+         systemtype("<"+stack.join(" ")+">ok<br />");
+         throw "";
+       }
+       var n=parseFloat(token);       // convert to number, javascript allow parseInt(str,base)
+       var nword=findword(token);
+       if (base!=10) {n=parseInt(token,base);}
+       if(nword>-1){var w=words[nword];
+         if(compiling && !w.immediate)compilecode(nword)
+         else execute(w.xt);      
+       }else if(n || token==0){         // if the token is a number
+         if(compiling){    
+         compilecode("dolit"); dictcompile(n);    // compile an literal
+       }else stack.push(n);  
+       }else {reset(); throw(token+" ? ");}
+   }
+   function tick(){token=nexttoken(); var i=findword(token); if(i>=0)stack.push(i);
+      else throw(" ? "+token);}
+
+// see
+  function toname(cfa) {
+     for (var i=0;i<words.length;i++) {
+       if (words[i].xt===cfa) {
+       return words[i].name;}
+     }
+     return "";
+  }
+  function see() {
+    var token=nexttoken();
+    var wid=findword(token);
+    var i=0;
+    if (wid>-1) {
+      var xt=words[wid].xt;
+      if(typeof(xt)==="function") {
+        systemtype(token+" is a primitive");
+        return;
+      }
+    cr(); var c=findword("docon"); var v=findword("dovar"); var x=xt; var lst=[x];
+    do {var cfa=dictionary[x]; var a=cfa&dictsize;
+      if (isprimitive(cfa)) { var n=words[a].name;
+        if(n==="dolit"||a===c||a===v)++x;
+        else if(n==="0branch"||n==="branch"||n==="donext")lst.push(++x);
+      }
+      x++;
+    } while ( words[a].xt!==ret && a!==c && a!==v );
+    do { if(xt in lst){cr(); greentype(xt+":&nbsp;");}
+      var cfa=dictionary[xt]; var a=cfa&dictsize;
+      if (isprimitive(cfa)) { var n=words[a].name;
+        systemtype(n+"&nbsp;");
+        if(n==="dolit"||a===c||a===v)systemtype((dictionary[++xt] & dictsize)+"&nbsp;");
+        else if(n==="0branch"||n==="branch"||n==="donext")greentype((dictionary[++xt] & dictsize)+"<br/>");
+          } else {
+          var name=toname(cfa);
+          if (name==="")
+            systemtype(cfa.toString(base)+"&nbsp;");
+          else systemtype(name+"&nbsp;");
+        }
+        xt++;
+        } while ( words[a].xt!==ret && a!==c && a!==v );
+    }}
+   
+
+// audio
+   function nop() {};
+   var audio = new AudioContext();
+   function beep(vol,freq,duration){
+     var osc = audio.createOscillator();
+     var amp = audio.createGain();
+     osc.connect(amp);
+     osc.frequency.value=parseFloat(freq);
+     osc.type="square";
+     amp.connect(audio.destination);
+     amp.gain.value=parseFloat(vol);
+     osc.start(audio.currentTime);
+     osc.stop(audio.currentTime+duration);
+     abortexec=true;
+     setTimeout(function() {
+       run();
+     }, duration * 1000);
+   }
+   
+// params of javascript function
+   var js_nparam = {lineTo:2 , moveTo:2, fillRect:4 , lineWidth:1};
+
+   var words = [
+
+// kernel
+   {name:"here"    ,xt:function(){ // here    ( -- a )
+      stack.push(here);}}
+  ,{name:","       ,xt:function(){ // ,    ( n -- ) comma
+     dictcompile(stack.pop());}}
+  ,{name:"dolit"   ,xt:function(){ // dolit    ( -- n ) literal
+     stack.push(dictionary[ip++]);}}
+  ,{name:"exit"    ,xt:ret}    // exit    ( -- ) exit colon word
+  ,{name:"dup"     ,xt:function(){ // dup    ( n -- n n ) 
+      stack.push(stack[stack.length-1]);}}
+  ,{name:"drop"    ,xt:function(){ // drop    ( n -- ) 
+      stack.pop();}}
+  ,{name:"@"    ,xt:function(){ // @ ( a -- n ) 
+     stack.push(dictionary[stack.pop()]);}}
+  ,{name:"!"    ,xt:function(){ // ! ( n a -- ) 
+     dictionary[stack.pop()]=stack.pop();}}
+  ,{name:"swap"     ,xt:function(){ // swap    ( a b -- b a )
+      var t=stack.length-1; var b=stack[t]; stack[t]=stack[t-1]; stack[t-1]=b;}}
+  ,{name:"over"     ,xt:function(){ // dup    ( n -- n n ) 
+      stack.push(stack[stack.length-2]);}}
+  ,{name:"nip"     ,xt:function(){ // nip    ( a b -- b )
+      stack[stack.length-2]=stack.pop();}}
+  ,{name:"rot"     ,xt:function(){ // rot    ( a b c -- b c a )
+      var t=stack.length-1; var a=stack[t-2]; stack[t-2]=stack[t-1]; stack[t-1]=stack[t]; stack[t]=a;}}
+  ,{name:"-rot"     ,xt:function(){ // rot    ( a b c -- c a b )
+      var t=stack.length-1; var a=stack[t-2]; stack[t-2]=stack[t]; stack[t]=stack[t-1]; stack[t-1]=a;}}
+  ,{name:"pick"     ,xt:function(){ // pick    ( nj ... n1 n0 j -- nj ... n1 n0 nj )
+      var t=stack.length-1; var j=stack[t]; stack[t]=stack[t-j-1];}}
+  ,{name:"roll"     ,xt:function(){ // roll    ( nj ... n1 n0 j -- ... n1 n0 nj )
+      var j=stack.pop();
+      if(j>0){
+        var t=stack.length-1;
+        var nj=stack[t-j];
+        for(i=j-1;i>=0;i--) stack[t-i-1]=stack[t-i];
+      stack[t]=nj;}}}
+  ,{name:"2dup"     ,xt:function(){ // swap    ( a b -- b a )
+      stack.push(stack[stack.length-2]);stack.push(stack[stack.length-2]);}}
+  ,{name:"2drop"    ,xt:function(){ // drop    ( n -- ) 
+      stack.pop();stack.pop();}}
+  ,{name:">r"     ,xt:function(){ // >r    ( n -- )
+      rstack.push(stack.pop());}}
+  ,{name:"r>"     ,xt:function(){ // r>    ( -- n )
+      stack.push(rstack.pop());}}
+  ,{name:"r@"     ,xt:function(){ // r>    ( -- i )
+      stack.push(rstack[rstack.length-1]);}}
+  ,{name:"push"     ,xt:function(){ // >r    ( n -- )
+      rstack.push(stack.pop());}}
+  ,{name:"pop"     ,xt:function(){ // r>    ( -- n )
+      stack.push(rstack.pop());}}
+  ,{name:"and"    ,xt:function(){ 
+      stack.push(stack.pop() & stack.pop());}}
+  ,{name:"or"    ,xt:function(){ 
+      stack.push(stack.pop() | stack.pop());}}
+  ,{name:"xor"    ,xt:function(){ 
+      stack.push(stack.pop() ^ stack.pop());}}
+  ,{name:"negate"    ,xt:function(){ 
+      stack.push(0-stack.pop());}}
+  ,{name:"2*"    ,xt:function(){ 
+      stack.push(stack.pop()<<1);}}
+  ,{name:"2/"    ,xt:function(){ 
+      stack.push(stack.pop()>>1);}}
+
+// math
+  ,{name:"1+"       ,xt:function(){ // 1+    ( a b -- c ) 
+      stack.push(stack.pop()+1);}}
+  ,{name:"2+"       ,xt:function(){ // 2+    ( a b -- c ) 
+      stack.push(stack.pop()+2);}}
+  ,{name:"1-"       ,xt:function(){ // 1-    ( a b -- c ) 
+      stack.push(stack.pop()-1);}}
+  ,{name:"2-"       ,xt:function(){ // 2-    ( a b -- c ) 
+      stack.push(stack.pop()-2);}}
+  ,{name:"+"    ,xt:function(){ // +    ( a b -- c ) 
+      stack.push(stack.pop()-(0-stack.pop()));}}
+  ,{name:"-"    ,xt:function(){ // -    ( a b -- c ) 
+      var b=stack.pop(); stack.push(stack.pop()-b);}}
+  ,{name:"*"       ,xt:function(){ // *    ( a b -- c ) 
+      stack.push(stack.pop()*stack.pop());}}
+  ,{name:"/"    ,xt:function(){ // /    ( a b -- c ) 
+      var b=stack.pop(); stack.push(stack.pop()/b);}}
+  ,{name:"mod"      ,xt:function(){ // mod    ( a b -- c ) 
+      var b=stack.pop(); stack.push(stack.pop()%b);}}
+  ,{name:"div"      ,xt:function(){ // div    ( a b -- c ) 
+      var b=stack.pop(); var a=stack.pop(); stack.push((a-(a%b))/b);}}
+
+// transcendental
+  ,{name:"pi"       ,xt:function(){ 
+      stack.push(Math.PI);}}
+  ,{name:"random"      ,xt:function(){ 
+      stack.push(Math.random());}}
+
+  ,{name:"int"      ,xt:function(){ // 
+      stack.push(Math.trunc(stack.pop()));}}
+  ,{name:"ceil"      ,xt:function(){ 
+      stack.push(Math.ceil(stack.pop()));}}
+  ,{name:"floor"      ,xt:function(){ // 
+      stack.push(Math.floor(stack.pop()));}}
+  ,{name:"sin"      ,xt:function(){ // 
+      stack.push(Math.sin(stack.pop()));}}
+  ,{name:"cos"      ,xt:function(){ // 
+      stack.push(Math.cos(stack.pop()));}}
+  ,{name:"tan"      ,xt:function(){ // 
+      stack.push(Math.tan(stack.pop()));}}
+  ,{name:"asin"      ,xt:function(){ // 
+      stack.push(Math.asin(stack.pop()));}}
+  ,{name:"acos"      ,xt:function(){ // 
+      stack.push(Math.acos(stack.pop()));}}
+  ,{name:"exp"      ,xt:function(){ // 
+      stack.push(Math.exp(stack.pop()));}}
+  ,{name:"log"      ,xt:function(){ // 
+      stack.push(Math.log(stack.pop()));}}
+  ,{name:"sqrt"      ,xt:function(){ // 
+      stack.push(Math.sqrt(stack.pop()));}}
+  ,{name:"int"      ,xt:function(){ // 
+      stack.push(Math.trunc(stack.pop()));}}
+  ,{name:"abs"      ,xt:function(){ // 
+      stack.push(Math.abs(stack.pop()));}}
+
+  ,{name:"max"    ,xt:function(){ // max    ( a b -- max ) 
+      var b=stack.pop(); stack.push(Math.max(stack.pop(),b));}}
+  ,{name:"min"    ,xt:function(){ // min    ( a b -- min ) 
+      var b=stack.pop(); stack.push(Math.min(stack.pop(),b));}}
+  ,{name:"atan2"       ,xt:function(){ 
+      var b=stack.pop(); stack.push(Math.atan2(stack.pop(),b));}}
+  ,{name:"pow"    ,xt:function(){ // power    ( a b -- a**b ) 
+      var b=stack.pop(); stack.push(Math.pow(stack.pop(),b));}}
+
+
+// compare
+  ,{name:"0="       ,xt:function(){ // 0=    ( a -- f ) 
+      stack.push(stack.pop()===0);}}
+  ,{name:"0<"       ,xt:function(){ // 0<    ( a -- f ) 
+      stack.push(stack.pop()<0);}}
+  ,{name:"0>"       ,xt:function(){ // 0>    ( a -- f ) 
+      stack.push(stack.pop()>0);}}
+  ,{name:"0<>"      ,xt:function(){ // 0<>    ( a -- f ) 
+      stack.push(stack.pop()!==0);}}
+  ,{name:"0<="      ,xt:function(){ // 0<=    ( a -- f ) 
+      stack.push(stack.pop()<=0);}}
+  ,{name:"0>="      ,xt:function(){ // 0>=    ( a -- f ) 
+      stack.push(stack.pop()>=0);}}
+  ,{name:"="    ,xt:function(){ // =    ( a b -- f ) 
+      stack.push(stack.pop()===stack.pop());}}
+  ,{name:">"    ,xt:function(){ // >    ( a b -- f ) 
+      var b=stack.pop(); stack.push(stack.pop()>b);}}
+  ,{name:"<"    ,xt:function(){ // >    ( a b -- f ) 
+      var b=stack.pop(); stack.push(stack.pop()<b);}}
+  ,{name:"<>"       ,xt:function(){ // <>    ( a b -- f ) 
+      stack.push(stack.pop()!==stack.pop());}}
+  ,{name:">="       ,xt:function(){ // >    ( a b -- f ) 
+      var b=stack.pop(); stack.push(stack.pop()>=b);}}
+  ,{name:"<="       ,xt:function(){ // >    ( a b -- f ) 
+      var b=stack.pop(); stack.push(stack.pop()<=b);}}
+  ,{name:"=="       ,xt:function(){ // ==    ( a b -- f ) 
+      stack.push(stack.pop()==stack.pop());}}
+
+
+// output
+  ,{name:"base@"   ,xt:function(){ // base@    ( -- n ) 
+         stack.push(base);}}
+  ,{name:"base!"   ,xt:function(){ // base!    ( n -- ) 
+         base=stack.pop();}}
+  ,{name:"hex"     ,xt:function(){ // hex    ( -- ) 
+     base=16;}}
+  ,{name:"decimal" ,xt:function(){ // decimal    ( -- ) 
+     base=10;}}
+  ,{name:"cr"      ,xt:cr}    // cr    ( -- ) 
+  ,{name:"."       ,xt:function(){ // .    ( n -- ) 
+     systemtype(stack.pop().toString(base)+"&nbsp;");}}
+  ,{name:"?"    ,xt:function(){ // ? ( a -- ) 
+     systemtype(dictionary[stack.pop()].toString(base)+"&nbsp;");}}
+  ,{name:".r"     ,xt:function(){ // .r    ( i n -- )
+      var n=stack.pop(); var i=stack.pop();
+      i=i.toString(base);
+      n=n-i.length;
+      if(n>0) do{ i="&nbsp;"+i; n--;}while(n>0);
+      systemtype(i); }}
+  ,{name:"emit"     ,xt:function(){
+      var s=String.fromCharCode(stack.pop());
+      systemtype(s);}}
+  ,{name:"space"     ,xt:function(){
+      var s="&nbsp;";
+      systemtype(s);}}
+  ,{name:"spaces"     ,xt:function(){   // ( n -- )
+      var n=stack.pop(); 
+      var s="";
+      for (i=0;i<n;i++) s+="&nbsp;";
+      systemtype(s);}}
+
+  ,{name:"["       ,xt:function(){ // [    ( -- ) 
+      compiling=false;},immediate:true}
+  ,{name:"]"       ,xt:function(){ // ]    ( -- ) 
+      compiling=true;}}
+  ,{name:"findword",xt:function(){ // findword    ( <name> -- i | -1 ) 
+     token=nexttoken(); stack.push(findword(token));}}
+  ,{name:"'"       ,xt:tick}    // '    ( <name> -- i ) 
+  ,{name:"(')"     ,xt:function(){ // '    ( -- i ) 
+     stack.push(dictionary[ip++])}}
+  ,{name:"[']"     ,xt:function(){ // '    ( <name> -- i ) 
+     compilecode("(')"); tick(); compilecode(stack.pop())},immediate:true}
+
+// strings
+  ,{name:"dostr"     ,xt:function(){ // next
+      stack.push(dictionary[ip++]);
+      }}
+  ,{name:'s"'     ,xt:function(){ // next
+      var s=nexttoken('"');
+     //console.log('['+s+']');
+      if (compiling) {
+    compilecode("dostr");
+    dictcompile(s);
+      } else {
+      stack.push(s);
+      }
+    }
+    ,immediate:true}
+ ,{name:"dotstr"     ,xt:function(){ 
+      systemtype(dictionary[ip++]);
+      }}
+  ,{name:'."'     ,xt:function(){ 
+      var s=nexttoken('"');
+     //console.log('['+s+']');
+      if (compiling) {
+    compilecode("dotstr");
+    dictcompile(s);
+      } else {
+      systemtype(s);
+      }
+    }
+    ,immediate:true}
+  ,{name:'('     ,xt:function(){ 
+      var s=nexttoken(')');
+    }
+    ,immediate:true}
+  ,{name:'.('     ,xt:function(){ 
+      var s=nexttoken(')');
+      systemtype(s);
+    }
+    ,immediate:true}
+  ,{name:'\\'     ,xt:function(){ 
+      var s=nexttoken('\n');
+    }
+    ,immediate:true}
+
+// structures
+  ,{name:"branch"    ,xt:function(){ // branch    ( -- ) 
+     ip=dictionary[ip]&dictsize;}}
+  ,{name:"0branch"    ,xt:function(){ // 0branch    ( n -- ) 
+     if(stack.pop())ip++; else ip=dictionary[ip]&dictsize;}}
+  ,{name:"donext"     ,xt:function(){ // donext    ( nj ... n1 n0 j -- ... n1 n0 nj )
+      var i=rstack.pop()-1; if(i>=0){ip=dictionary[ip]; rstack.push(i); }
+      else ip++;}}
+  ,{name:"if"      ,xt:function(){ // if    ( -- here ) 
+      compilecode("0branch"); stack.push(here); dictcompile(0);},immediate:true}
+  ,{name:"else"    ,xt:function(){ // else    ( there -- here ) 
+      compilecode("branch"); var h=here; dictcompile(0); dictionary[stack.pop()]=here; stack.push(h);},immediate:true}
+  ,{name:"then"    ,xt:function(){ // then    ( there -- ) 
+      dictionary[stack.pop()]=here;},immediate:true}
+  ,{name:"begin"    ,xt:function(){ // begin    ( -- here ) 
+      stack.push(here);},immediate:true}
+  ,{name:"again"    ,xt:function(){ // again    ( there -- ) 
+      compilecode("branch"); compilecode(stack.pop());},immediate:true}
+  ,{name:"until"    ,xt:function(){ // until    ( there -- ) 
+      compilecode("0branch"); compilecode(stack.pop());},immediate:true}
+  ,{name:"while"    ,xt:function(){ // while    ( there -- there here ) 
+      compilecode("0branch"); stack.push(here); dictcompile(0);},immediate:true}
+  ,{name:"repeat"   ,xt:function(){ // repeat    ( there1 there2 -- ) 
+      compilecode("branch"); var w=stack.pop(); compilecode(stack.pop()); dictionary[w]=here;},immediate:true}
+  ,{name:"for"     ,xt:function(){ // for
+      compilecode(">r"); stack.push(here);},immediate:true}
+  ,{name:"next"     ,xt:function(){ // next
+      compilecode("donext"); dictionary[here++]=stack.pop();},immediate:true}
+  ,{name:"aft"     ,xt:function(){ // aft
+      stack.pop();compilecode("branch");var w=here;compilecode(0);
+      stack.push(here);stack.push(w);},immediate:true}
+
+// defining words
+  ,{name:"does>"     ,xt:function(){ 
+      dictionary[words[words.length-1].xt] =ip;
+      compilecode("exit");
+      }}
+  ,{name:"docol"    ,xt:function(){} }    // enter colon word
+  ,{name:":"       ,xt:function(){ // :    ( <name> -- ) 
+      newname=nexttoken();newxt=here; compilecode("docol"); compiling=true;}}
+  ,{name:";"       ,xt:function(){ // ;    ( -- ) 
+      compiling=false;
+      compilecode("exit");
+      words.push({name:newname,xt:newxt});
+    },immediate:true}
+  ,{name:"docon"    ,xt:function(){ // docon    ( -- n ) 
+      stack.push(dictionary[ip]); ret();}}
+  ,{name:"constant" ,xt:function(){ // constant ( <name> -- ) 
+     newname=nexttoken(); words.push({name:newname,xt:here}); compilecode("docon"); dictcompile(stack.pop());}}
+  ,{name:"dovar"    ,xt:function(){ // dovar    ( -- a ) 
+      stack.push(ip); ret();}}
+  ,{name:"variable" ,xt:function(){ // variable ( <name> -- ) 
+     newname=nexttoken(); words.push({name:newname,xt:here}); compilecode("dovar"); dictionary[here++]=0;}}
+  ,{name:"create"   ,xt:function(){ // create ( <name> -- ) 
+     newname=nexttoken(); words.push({name:newname,xt:here}); compilecode("dovar");}}
+  ,{name:"allot"    ,xt:function(){ // allot ( n -- ) 
+     var h=here; here+=stack.pop(); for(var i=h;i<here;i++)dictionary[i]=0;}}
+
+// tools
+  ,{name:".s"       ,xt:function(){ // ,s    ( -- ) 
+     if(stack.length>0)for(var i in stack)systemtype(stack[i]+" ")
+     else systemtype("empty");}}
+  ,{name:"words"   ,xt:function(){ // words    ( -- ) 
+     for(var i in words)systemtype(words[i].name+" ");}}
+  ,{name:"see"      ,xt:see}     // see    ( <name> -- ) 
+  ,{name:"date"   ,xt:function(){ // date   ( -- ) 
+     var d= new Date(); ticktype(d+"<br/>");}}
+
+// canvas
+  ,{name:"canvas:" , xt :function() { //create a context object
+      var canvasid=nexttoken();
+      var canvas=document.getElementById(canvasid);
+      var c=canvas.getContext('2d');
+      words.push({name:canvasid,xt:here}); 
+      compilecode("docon");
+      dictcompile(c);
+      compilecode("exit");
+     }}
+     // cv :: lineTo
+   ,{name:"::" , xt: function() {  // make a javascript call
+      var funcname=nexttoken();
+      var obj=stack.pop();
+      var fn=obj[funcname];
+      if (fn) {
+     var pcount=fn.length;
+     if (fn.length===0) pcount=js_nparam[fn.name]; //try to fetch from array
+     if (pcount==undefined) pcount=0;
+     var params=[];
+     for (var i=0; i<pcount;i++) params[pcount-i-1]=stack.pop();
+     fn.apply(obj, params);
+      } else {
+     throw(funcname+" ? ");
+      }
+    }}
+  ,{name:":!" , xt: function() {  // make a javascript call
+      var propname=nexttoken();
+      var obj=stack.pop();
+      //var prop=obj.__proto__[propname];
+      obj[propname]=stack.pop() ;
+      },immediate:true}
+  ,{name:":@" , xt: function() {  // make a javascript call
+      var propname=nexttoken();
+      var obj=stack.pop();
+      //var prop=obj.__proto__[propname];
+      stack.push( obj[propname] ) ;
+      }}    
+  ,{name:"tone" , xt: function() {  // ( vol freq seconds -- )
+      var a=stack.pop(); var b=stack.pop(); var c=stack.pop();
+      beep(c,b,a);
+      }}    
+   ]
+   this.exec= exec;  // make exec become a public interface
+ }
+ window.KsanaVm=KsanaVm;  // export KsanaVm as a global variable
+})();

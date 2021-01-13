@@ -1,0 +1,90 @@
+﻿/* jeForth 2.01
+A minimalist Forth Implementation in Javascript
+2015/12/25    Chen-Hanson Ting update for svfig
+    catch-throw, 
+2011/12/23 initial version by yapcheahshen@gmail.com */
+"uses strict";
+(function() {
+    function KsanaVm(dictsize) {
+    var ip=0; // instruction pointer
+    var abortexec=false;
+    dictsize = dictsize || 0xfff;          // default 4095 cells 
+    var dictionary = new Array(dictsize+1) ;
+    var stack = [] , rstack =[];           // array allows push and pop
+    var tib="", ntib=0 , here=0;
+    var compiling=false;
+    this.ticktype=0; // 'type vector
+    var newname,newxt; // for word under construction
+function cr() {    systemtype("<"+stack.join(" ")+">ok\n"); }
+function systemtype(t) {if (ticktype) ticktype(t);}
+function nexttoken() {
+    var token="";
+    while (tib.substr(ntib,1)==' ') ntib++;
+    while (ntib<tib.length && tib.substr(ntib,1)!=' ') token+=tib.substr(ntib++,1);
+    return token;}
+function dictcompile(n) {dictionary[here++]=n;} 
+function reset() { abortexec=true; stack=[]; rstack=[];}
+function findword(name) {
+    for (var i=words.length-1;i>0;i--) { if (words[i].name===name)  return i; }
+    return -1;}
+/* in dictionary, primitive words have the format of 0x40000000+index */
+function isprimitive(addr) { return (addr & 0x40000000);}
+function execprimitive(addr) {words[addr & dictsize].xt() ;}
+function stackpop(){
+    var s=stack.pop();
+    if (s===undefined) throw(" stack empty\n");
+    return s; }
+function compilecode(nword) { 
+  if ( typeof(nword) ==="string" ) nword=findword(nword); 
+  if ( typeof(words[nword].xt) ==="function" ) {      
+    dictcompile( 0x40000000 | nword);  }    // a primitive, xt is a function 
+  else { dictcompile(words[nword].xt) ; }}  // high level words , xt is a number
+function execute(xt) {                      // run a word 
+    if (typeof(xt)==="function") xt() ;     // primitive , execute it directly
+    else {    call(xt);}}                   // make a high level call
+function call(address) {                    // inner loop 
+    abortexec=false; ip=address;
+    do { addr=dictionary[ip++];             // go to next cell
+         if (isprimitive(addr)) {
+           execprimitive(addr); }          // primitive word
+         else { rstack.push(ip);                 
+           call(addr); }                 // high level word
+    } while (!abortexec);}
+function ret() {                            // high level return
+    if (rstack.length===0) { abortexec=true; return; }
+    ip=rstack.pop();}
+function exec(cmd) {                        // outer loop
+    tib=cmd; ntib=0;
+    do {  
+      var token=nexttoken();
+      if (token==="") break;
+      var n=parseInt(token);                // convert to number, javascript allow parseInt(str,base)
+      var nword=findword(token);
+      if (nword>-1) { 
+        var w=words[nword]; 
+        if (compiling && !w.immediate) { compilecode(nword); }
+        else { execute( w.xt); } }
+      else if (n) {                        // if the token is a number
+        if (compiling) {    
+          compilecode("dolit");              // compile an literal
+          dictcompile(n); }
+        else { stack.push(n);  } }
+      else { throw(" "+token+"?");  }
+    } while (true);
+    cr(); }
+  var words = [
+    {name:"here" ,xt:function(){stack.push(here);}}
+   ,{name:","    ,xt:function(){dictcompile(stackpop());}}
+   ,{name:"dolit",xt:function(){stack.push(dictionary[ip++]);}}
+   ,{name:"ret"  ,xt:function(){ret();}}
+   ,{name:":"    ,xt:function(){newname=nexttoken();newxt=here; compiling=true; }}
+   ,{name:";"    ,xt:function(){compiling=false; compilecode("ret"); words.push({name:newname,xt:newxt}) } , immediate: true }
+   ,{name:"*"    ,xt:function(){stack.push(stackpop()*stackpop());}}
+   ,{name:"."    ,xt:function(){systemtype(stackpop()+" ");}}
+   ,{name:"dup"  ,xt:function(){stack.push(stack[stack.length-1]);}}
+   ,{name:"x"    ,xt:function(){throw(" my error");}}
+  ]
+  this.exec= exec;  // make exec become a public interface
+}
+window.KsanaVm=KsanaVm;  // export KsanaVm as a global variable
+})();

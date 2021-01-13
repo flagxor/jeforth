@@ -1,0 +1,37 @@
+﻿<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<canvas id="cv" width=200 height=110></canvas>
+<title>jeforth 2.02</title>
+<style> body { font-family: 'Courier New', monospace; font-size: 14px;}</style>
+<script src="jeforth202.js"> // jeforth virtual machine KsanaVm // </script>
+</head><body>
+<br/><textarea id="tib" cols=80 rows=10 size="60" onkeydown="if (13===event.keyCode) fortheval()">
+canvas: cv
+s" #8ac6e5" cv :! strokeStyle
+3 cv :! lineWidth
+cv :: beginPath
+50  0 cv :: moveTo 50  50 cv :: lineTo  7 75 cv :: lineTo
+ 7 25 cv :: lineTo 50   0 cv :: lineTo 93 25 cv :: lineTo 
+93 75 cv :: lineTo 50 100 cv :: lineTo  7 75 cv :: lineTo 
+50 50 cv :: moveTo 93  75 cv :: lineTo
+cv :: stroke
+</textarea>
+<div id="log" style="overflow: auto; height: 300px; width: 600px;" ></div> 
+
+</body>
+<script>
+  var kvm=new KsanaVm();
+  var log=document.getElementById("log");
+  log.innerHTML="jeforth 2.02<br/>";
+  var tib=document.getElementById("tib");
+ 
+  kvm.ticktype=ticktype;
+  function fortheval() {
+    log.innerHTML+="<font color='blue'>"+tib.value+"  </font>";
+    try{kvm.exec(tib.value);}
+    catch(err){ticktype(err.toString()+"<br/>");}
+    finally{tib.value=""; log.scrollTop = log.scrollHeight; }
+    }
+  function ticktype(t){log.innerHTML=log.innerHTML+t;}  // 
+</script>
+</html>
