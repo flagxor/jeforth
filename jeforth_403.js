@@ -6,7 +6,10 @@
 2021/1/7    Chen-Hanson Ting update for svfig
     2.01-2.03 execute-nest-exit, quit loop 
 2011/12/23 initial version by Yap cheahshen and Sam Chen */
-"uses strict";
+"use strict";
+
+function jeforth() {
+
 (function() {
     function KsanaVm(dictsize) {
     var ip=0,wp=0,w=0; // instruction pointer
@@ -67,21 +70,6 @@
   function exec(cmd) {                   // : quit begin token exec again ;
     tib=cmd;ntib=0;rstack=[];wp=0;ip=0;w=0;compiling=false;execute(0);}
 
-// audio
-   var audio = new AudioContext();
-   function beep(vol,freq,duration){
-     var osc = audio.createOscillator();
-     var amp = audio.createGain();
-     osc.connect(amp);
-     osc.frequency.value=freq;
-     osc.type="square";
-     amp.connect(audio.destination);
-     amp.gain.value=vol;
-     osc.start(audio.currentTime);
-     osc.stop(audio.currentTime+duration);
-     while(osc.context.stat==="running"){};
-   }
-   
 // params of javascript function
    var js_nparam = {lineTo:2 , moveTo:2, fillRect:4 , lineWidth:1};
 
@@ -278,21 +266,23 @@
      var n=stack.pop(); for(var i=0;i<n;i++) words[words.length-1].pf.push(0);}}
 
 // canvas
+/*
   ,{name:"width" ,xt:function(){docon();},pf:[width]}
   ,{name:"height",xt:function(){docon();},pf:[height]}
+*/
   ,{name:"image@",xt: function() {  // ( a -- r g b )
       var a=stack.pop(); 
           stack.push(imagedata.data[a]);       // Red
           stack.push(imagedata.data[a+1]);     // Green
           stack.push(imagedata.data[a+2]);     // Blue
-      }}    
+      }}
   ,{name:"image!" , xt: function() {  // ( r g b a -- )
       var a=stack.pop(); var b=stack.pop(); var g=stack.pop(); var r=stack.pop();
           imagedata.data[a]   = r;     // Red
           imagedata.data[a+1] = g;     // Green
           imagedata.data[a+2] = b;     // Blue
           imagedata.data[a+3] = 255;   // Alpha
-      }}    
+      }}   
   ,{name:"proto"  ,xt:function()       // ( x y -- r g b )
       {nest();},pf:[11,11,5,0,5,255,5,0,6]}
   ,{name:"vector"  ,xt:function(){     // ( a b -- ) vector b to a )
@@ -312,5 +302,68 @@
   fence=words.length;
   this.exec= exec;  // make exec become a public interface
   }
-window.KsanaVm=KsanaVm;  // export KsanaVm as a global variable 
+
+var sharedArrayInt;
+var sharedArray;
+var kvm=new KsanaVm();
+kvm.ticktype = ticktype;
+
+function send(op) {
+  Atomics.store(sharedArrayInt, 0, op);
+  Atomics.wait(sharedArrayInt, 0, op);
+}
+
+function ticktype(t) {
+  sharedArray[1] = t.length;
+  for (var i = 0; i < t.length; ++i) {
+    sharedArray[i + 2] = t.charCodeAt(i);
+  }
+  // Send a print message (1) atomically.
+  send(1);
+}
+
+function readline() {
+  // Send a print message (2) atomically.
+  send(2);
+  var len = sharedArray[1];
+  var ret = '';
+  for (var i = 0; i < len; ++i) {
+    ret += String.fromCharCode(sharedArray[i + 2]);
+  }
+  return ret;
+}
+
+function beep(vol, freq, duration) {
+  sharedArray[1] = vol;
+  sharedArray[2] = parseFloat(freq);
+  sharedArray[3] = duration;
+  // Send a beep message (3) atomically.
+  send(3);
+}
+
+function finish() {
+  // Send a finish message (4) atomically.
+  send(4);
+}
+
+function fortheval(cmd) {
+  try {
+    kvm.exec(cmd);
+  } catch(err) {
+    ticktype(err.toString()+"<br/>");
+  }
+}
+
+self.addEventListener('message', (m) => {
+  sharedArrayInt = new Int32Array(m.data);
+  sharedArray = new Float64Array(m.data);
+  while (true) {
+    var cmd = readline();
+    fortheval(cmd);
+    finish();
+  }
+});
+
 })();
+
+}

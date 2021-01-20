@@ -33,17 +33,79 @@
     }}}
     createImage();
     context.putImageData(imagedata, 0, 0);
-    var kvm=new KsanaVm();
     var log=document.getElementById("log");
     log.innerHTML="jeforth 2.02<br/>";
     var tib=document.getElementById("tib");
-    kvm.ticktype=ticktype;
+    function ticktype(t){log.innerHTML=log.innerHTML+t;}  //
+
+    var workerCode = jeforth.toString() + '\njeforth();\n';
+    var worker = new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'text/javascript'})));
+    var audio;
+    const sharedArrayBuffer = new SharedArrayBuffer(64 * 1024);
+    const sharedArrayInt = new Int32Array(sharedArrayBuffer); 
+    const sharedArray = new Float64Array(sharedArrayBuffer); 
+
+    worker.postMessage(sharedArrayBuffer);
+    setInterval(function() {
+      var op = Atomics.load(sharedArrayInt, 0);
+      switch (op) {
+        case 1:  // Type
+          var len = sharedArray[1];
+          var text = '';
+          for (var i = 0; i < len; ++i) {
+            text += String.fromCharCode(sharedArray[i + 2]);
+          }
+          ticktype(text);
+          Atomics.store(sharedArrayInt, 0, 0);
+          Atomics.notify(sharedArrayInt, 0, 1);
+          break;
+        case 2:  // Readline
+          Atomics.store(sharedArrayInt, 0, -1);
+          break;
+        case 3:  // Beep
+          // Stop early on bad input.
+          if (!isFinite(sharedArray[2])) {
+            Atomics.store(sharedArrayInt, 0, 0);
+            Atomics.notify(sharedArrayInt, 0, 1);
+            break;
+          }
+          var osc = audio.createOscillator();
+          var amp = audio.createGain();
+          osc.connect(amp);
+          osc.frequency.value = sharedArray[2];  // freq
+          osc.type = "square";
+          amp.connect(audio.destination);
+          amp.gain.value = sharedArray[1];
+          osc.start(audio.currentTime);
+          osc.stop(audio.currentTime + sharedArray[3]);
+          Atomics.store(sharedArrayInt, 0, -1);
+          osc.onended = function() {
+            Atomics.store(sharedArrayInt, 0, 0);
+            Atomics.notify(sharedArrayInt, 0, 1);
+          };
+          break;
+        case 4:  // Finish
+          tib.value="";
+          log.scrollTop = log.scrollHeight;
+          Atomics.store(sharedArrayInt, 0, 0);
+          Atomics.notify(sharedArrayInt, 0, 1);
+          break;
+      }
+    }, 1);
+
     function fortheval() {
-    log.innerHTML+="<font color='blue'>"+tib.value+"  </font>";
-    try{kvm.exec(tib.value);}
-    catch(err){ticktype(err.toString()+"<br/>");}
-    finally{tib.value=""; log.scrollTop = log.scrollHeight; }
+      if (audio === undefined) {
+        // Done here to wait for user gesture.
+        audio = new AudioContext();
+      }
+      log.innerHTML+="<font color='blue'>"+tib.value+"  </font>";
+      sharedArray[1] = tib.value.length;
+      for (var i = 0; i < tib.value.length; ++i) {
+        sharedArray[i + 2] = tib.value.charCodeAt(i);
+      }
+      Atomics.store(sharedArrayInt, 0, 0);
+      Atomics.notify(sharedArrayInt, 0, 1);
     }
-    function ticktype(t){log.innerHTML=log.innerHTML+t;}  // 
+ 
 </script>
 </html>
