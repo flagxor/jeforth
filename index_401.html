@@ -12,12 +12,14 @@
   kvm.ticktype=ticktype;  
   ticktype("jeforth 4.01\n");
   
+  function onerr(err) {
+    ticktype(err.toString()+"\n");
+    tib.value="";log.scrollTop=log.scrollHeight;
+  }
   function fortheval() {
     var tib=document.getElementById("tib");
     ticktype(tib.value);
-    try{kvm.exec(tib.value);}
-    catch(err){ticktype(err.toString()+"\n");}
-    finally{tib.value="";log.scrollTop=log.scrollHeight;}
+    kvm.exec(tib.value, onerr);
   }
   function ticktype(t) { log.value=log.value+t; }  // log
 </script>

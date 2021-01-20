@@ -2,7 +2,7 @@
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <title>jeforth 4.02</title>
 <style> body { font-family: 'Courier New', monospace; font-size: 14px;}</style>
-<script src="jeforth_0.js"> // jeforth virtual machine KsanaVm // </script>
+<script src="jeforth_402.js"> // jeforth virtual machine KsanaVm // </script>
 </head><body>
 <br/><textarea id="tib" cols=80 rows=10 size="60" onkeydown="if (13===event.keyCode) fortheval()">
 : square dup * ; : quad square square ; : octet quad quad ; 
@@ -18,12 +18,14 @@
   var tib=document.getElementById("tib");
  
   kvm.ticktype=ticktype;
+  function onerr(err) {
+    ticktype(err.toString()+"<br/>");
+    tib.value="";log.scrollTop=log.scrollHeight;
+  }
   function fortheval() {
     log.innerHTML+="<font color='blue'>"+tib.value+"  </font>";
-    try{kvm.exec(tib.value);}
-    catch(err){ticktype(err.toString()+"<br/>");}
-    finally{tib.value="";log.scrollTop=log.scrollHeight; }
-    }
+    kvm.exec(tib.value, onerr);
+  }
   function ticktype(t){log.innerHTML=log.innerHTML+t;}  // 
 </script>
 </html>

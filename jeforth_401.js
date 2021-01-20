@@ -31,7 +31,7 @@
     if (n>-1) dictcompile(n);
     else {reset(); throw(" "+nword+"?");}}
   function execute(n){w=n;words[n].xt();}
-  function next(){var n=words[wp].pf[ip++];execute(n);}
+  function next(){setTimeout(function() {try{var n=words[wp].pf[ip++];execute(n);} catch(e) { }}, 0);}
   function exit(){ip=rstack.pop();wp=rstack.pop();next();}
   function nest(){rstack.push(wp);rstack.push(ip);wp=w;ip=0;next();}
   function exectoken(cmd){               // outer loop
