@@ -68,6 +68,9 @@
     tib=cmd;ntib=0;rstack=[];wp=0;ip=0;w=0;compiling=false;execute(0);}
 
 // audio
+   function sleep(ms){
+     var d=Date.now(); var n=d;do {n=Date.now();} while (n-d < ms);}
+   var AudioContext = window.AudioContext || window.webkitAudioContext;
    var audio = new AudioContext();
    function beep(vol,freq,duration){
      var osc = audio.createOscillator();
@@ -77,13 +80,42 @@
      osc.type="square";
      amp.connect(audio.destination);
      amp.gain.value=vol;
-     osc.start(audio.currentTime);
-     osc.stop(audio.currentTime+duration);
-     while(osc.context.stat==="running"){};
+     osc.start();
+     sleep(duration);
+     osc.stop();
+   }
+   function poly(vol,bass,tenor,alto,soprano,duration){
+     var amp = audio.createGain();
+     amp.connect(audio.destination);
+     amp.gain.value=vol;
+     var osc1 = audio.createOscillator();
+     osc1.connect(amp);
+     osc1.frequency.value=bass;
+     osc1.type="square";
+     osc1.start();
+     var osc2 = audio.createOscillator();
+     osc2.connect(amp);
+     osc2.frequency.value=tenor;
+     osc2.type="square";
+     osc2.start();
+     var osc3 = audio.createOscillator();
+     osc3.connect(amp);
+     osc3.frequency.value=alto;
+     osc3.type="square";
+     osc3.start();
+     var osc4 = audio.createOscillator();
+     osc4.connect(amp);
+     osc4.frequency.value=soprano;
+     osc4.type="square";
+     osc4.start();
+     sleep(duration);
+     osc1.stop();
+     osc2.stop();
+     osc3.stop();
+     osc4.stop();
    }
    
-// params of javascript function
-   var js_nparam = {lineTo:2 , moveTo:2, fillRect:4 , lineWidth:1};
+// word objects
 
   var words = [
    {name:"quit"  ,xt:function(){nest();},pf:[1,2,3,0]}
@@ -124,14 +156,8 @@
   ,{name:"or"    ,xt:function(){stack.push(stack.pop() | stack.pop());}}
   ,{name:"xor"   ,xt:function(){stack.push(stack.pop() ^ stack.pop());}}
   ,{name:"negate",xt:function(){stack.push(0-stack.pop());}}
-  ,{name:"2*"    ,xt:function(){stack.push(stack.pop()<<1);}}
-  ,{name:"2/"    ,xt:function(){stack.push(stack.pop()>>1);}}
 
 // math
-  ,{name:"1+"    ,xt:function(){stack.push(stack.pop()+1);}}
-  ,{name:"2+"    ,xt:function(){stack.push(stack.pop()+2);}}
-  ,{name:"1-"    ,xt:function(){stack.push(stack.pop()-1);}}
-  ,{name:"2-"    ,xt:function(){stack.push(stack.pop()-2);}}
   ,{name:"+"     ,xt:function(){stack.push(stack.pop()-(0-stack.pop()));}}
   ,{name:"-"     ,xt:function(){var b=stack.pop(); stack.push(stack.pop()-b);}}
   ,{name:"*"     ,xt:function(){stack.push(stack.pop()*stack.pop());}}
@@ -212,9 +238,10 @@
   ,{name:'\\'  ,xt:function(){var s=nexttoken('\n');},immediate:true}
 
 // structures
-  ,{name:"to"  ,xt:function(){
-      var a=words[wp].pf[ip++]; // only in colon words like branch
+  ,{name:"to"  ,xt:function(){var a=words[wp].pf[ip++]; // only in colon words like branch
       words[a].pf[0]=stack.pop();}}
+//      if (words[a].xt==="function(){docon();}") words[a].pf[0]=stack.pop();
+//      else throw(" "+token+" not to a constant ");}}
   ,{name:"branch" ,xt:function(){ip=words[wp].pf[ip];}}
   ,{name:"0branch",xt:function(){if(stack.pop()) ip++;else ip=words[wp].pf[ip];}}
   ,{name:"donext" ,xt:function(){
@@ -280,6 +307,8 @@
 // canvas
   ,{name:"width" ,xt:function(){docon();},pf:[width]}
   ,{name:"height",xt:function(){docon();},pf:[height]}
+  ,{name:"x"     ,xt:function(){docon();},pf:[0]}
+  ,{name:"y"     ,xt:function(){docon();},pf:[0]}
   ,{name:"image@",xt: function() {  // ( a -- r g b )
       var a=stack.pop(); 
           stack.push(imagedata.data[a]);       // Red
@@ -299,14 +328,19 @@
       var b=stack.pop(); var a=stack.pop(); 
       words[b].pf=words[a].pf;
       }}
-  ,{name:"show" , xt: function() {  // ( vol freq seconds -- )
+  ,{name:"show" , xt: function() {  // ( -- )
       context.putImageData(imagedata, 0, 0);
       }}    
 
 // tone
-  ,{name:"tone" , xt: function() {  // ( vol freq seconds -- )
-      var a=stack.pop(); var b=stack.pop(); var c=stack.pop();
+  ,{name:"tone" , xt: function() {  // ( vol freq duration-- )
+      var a=stack.pop(); var b=stack.pop(); var c=stack.pop()
       beep(c,b,a);
+      }}    
+  ,{name:"poly" , xt: function() {  // ( vol bass tenor alto soprano duration-- )
+      var a=stack.pop(); var b=stack.pop(); var c=stack.pop()
+      var d=stack.pop(); var e=stack.pop(); var f=stack.pop()
+      poly(f,e,d,c,b,a);
       }}    
    ]
   fence=words.length;
