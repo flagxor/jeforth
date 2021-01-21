@@ -1,0 +1,158 @@
+( bach bwv846, c major prelude )
+( save data for micrpython, 2/23/2017 )
+( mono version for jeforth403, 1/20/2021 )
+
+0 constant bass
+0 constant tenor
+0 constant alto
+0 constant soprano
+
+variable ppqn 350 ppqn ! ( 250 ms )
+: ms 15000 for next ;
+: delay for aft ms then next ;
+: play ( duration -- )
+  >r 0.1 bass tenor alto soprano  r> poly ;
+: ppqn@ ppqn @ ; 
+: 1/4 ppqn@ play ; 
+: 1/2 ppqn@ 2 * play ;
+: 1/1 ppqn@ 4 * play ;
+: 1/8 ppqn@ 2 / play ; 
+: 3/4 ppqn@ 3 * play ; 
+: 3/8 ppqn@ 1.5 * play ;
+
+: cord ( n1 n2 n3 n4 n5 --- )
+  >r >r >r >r to bass 0 to tenor 0 to alto 0 to soprano 1/8
+  r> to tenor 1/8 r> dup to soprano 1/8
+  r> dup to soprano 1/8 r@ to soprano 1/8
+  swap to soprano 1/8 to soprano 1/8 r> to soprano 1/8 ;
+: cord4 ( n1 n2 n3 n4 -- )
+  >r >r >r to bass 0 to tenor 0 to alto 0 to soprano 1/8
+  r> to tenor 1/8 r> to soprano 1/8 r> to soprano 1/8 ;
+: cord6 ( n1 n2 n3 n4 n5 n6-- )
+  >r >r >r to soprano to tenor to bass 0 to alto 1/8 
+  r> to soprano 1/8 r> to soprano 1/8 r> to soprano 1/8 ;
+
+( notes ) 
+1047 constant c6 
+987.8 constant b5
+932.3 constant a5#
+932.3 constant b5b
+880 constant a5
+830.6 constant g5#
+830.6 constant a5b
+784 constant g5
+740 constant f5#
+740 constant g5b 
+698.5 constant f5
+659.3 constant e5
+622.3 constant d5#
+622.3 constant e5b
+587.3 constant d5
+554.4 constant c5#
+554.4 constant d5b
+523.3 constant c5 
+493.9 constant b4
+466.2 constant b4b
+466.2 constant a4#
+440 constant a4
+415.3 constant g4#
+415.3 constant a4b
+392 constant g4
+370 constant f4#
+370 constant g4b 
+349.2 constant f4
+329.6 constant e4
+311.1 constant d4#
+311.1 constant e4b
+293.7 constant d4
+277.2 constant c4#
+277.2 constant d4b
+261.6 constant c4 
+246.9 constant b3
+233.1 constant a3#
+233.1 constant b3b
+220 constant a3
+207.7 constant g3#
+207.7 constant a3b
+196 constant g3
+185 constant f3#
+185 constant g3b 
+174.6 constant f3
+164.8 constant e3
+155.6 constant d3#
+155.6 constant e3b
+146.8 constant d3
+138.6 constant c3#
+138.6 constant d3b
+130.8 constant c3 
+123.5 constant b2
+116.5 constant a2#
+116.5 constant b2b
+110 constant a2
+103.8 constant g2#
+103.8 constant a2b
+98 constant g2
+92.50 constant f2#
+92.50 constant g2b 
+87.31 constant f2
+82.41 constant e2
+77.78 constant d2#
+77.78 constant e2b
+73.42 constant d2
+69.30 constant c2#
+69.30 constant d2b
+65.41 constant c2
+
+: p1 c4 e4 g4 c5 e5 cord ;
+: p2 c4 d4 a4 d5 f5 cord ;
+: p3 b3 d4 g4 d5 f5 cord ;
+: p4 c4 e4 g4 c5 e5 cord ;
+: p5 c4 e4 a4 e5 a5 cord ;
+: p6 c4 d4 f4# a4 d5 cord ;
+: p7 b3 d4 g4 d5 g5 cord ;
+: p8 b3 c4 e4 g4 c5 cord ;
+: p9 a3 c4 e4 g4 c5 cord ;
+: p10 d3 a3 d4 f4# c5 cord ;
+: p11 g3 b3 d4 g4 b4 cord ;
+: p12 g3 a3# e4 g4 c5# cord ;
+: p13 f3 a3 d4 a4 d5 cord ;
+: p14 f3 g3# d4 f4 b4 cord ;
+: p15 e3 g3 c4 g4 c5 cord ;
+: p16 e3 f3 a3 c4 f4 cord ;
+: p17 d3 f3 a3 c4 f4 cord ;
+: p18 g2 d3 g3 b3 f4 cord ;
+: p19 c3 e3 g3 c4 e4 cord ;
+: p20 c3 g3 a3# c4 e4 cord ;
+: p21 f2 f3 a3 c4 e4 cord ;
+: p22 f2# c3 a3 c4 d4# cord ;
+: p23 g2 d3# b3 c4 d4# cord ;
+: p24 g2# f3 b3 c4 d4 cord ;
+: p25 g2 f3 g3 b3 d4 cord ;
+: p26 g2 e3 g3 c4 e4 cord ;
+: p27 g2 d3 g3 c4 f4 cord ;
+: p28 g2 d3 g3 b3 f4 cord ;
+: p29 g2 d3# a3 c4 f4# cord ;
+: p30 g2 e3 g3 c4 g4 cord ;
+: p31 g2 d3 g3 c4 f4 cord ;
+: p32 g2 d3 g3 b3 f4 cord ;
+: p33 c2 c3 g3 a3# e4 cord ;
+: p34 c2 c3 f3 a3 cord4 c2 c3 c4 f4 c4 a3 cord6
+  c2 c3 c4 a3 f3 a3 cord6 c2 c3 f3 d3 f3 d3 cord6 ;
+: p35 c2 b2 g4 b4 cord4 c2 b2 d5 f5 d5 b4 cord6
+  c2 b2 d5 b4 g4 b4 cord6 c2 b2 d4 f4 e4 d4 cord6 ;
+: end c2 to bass 0 to tenor 0 to alto 0 to soprano 1/8
+  c3 to tenor 1/8 e4 to alto 1/8 g4 to soprano 1/8
+  c5 to tenor 1/1 ;
+: prelude
+	p1   p1  p2  p2  p3  p3  p4  p4  p5  p5 
+	p6   p6  p7  p7  p8  p8  p9  p9 p10 p10 
+	p11 p11 p12 p12 p13 p13 p14 p14 p15 p15 
+	p16 p16 p17 p17 p18 p18 p19 p19 p20 p20 
+	p21 p21 p22 p22 p23 p23 p24 p24 p25 p25 
+	p26 p26 p27 p27 p28 p28 p29 p29 p30 p30 
+	p31 p31 p32 p32 p33 p33 
+        p34 p35 end ;
+cr date prelude date
+
+
+
